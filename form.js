@@ -1,6 +1,7 @@
 // ---------------- API BASE ----------------
 
-const API_BASE_URL = "https://ai-stress-detection-system-mediapipe-urkh.onrender.com";
+const API_BASE_URL =
+  "https://ai-stress-detection-system-mediapipe-urkh.onrender.com";
 
 // ---------------- REGEX PATTERNS ----------------
 
@@ -78,7 +79,7 @@ async function register() {
       showMessage(msg, data.message || "Registration failed!");
     }
   } catch (error) {
-    console.error(error);
+    console.error("Register Error:", error);
     showMessage(msg, "Server error!");
   }
 }
@@ -87,7 +88,6 @@ async function register() {
 
 async function login() {
   const username = document.getElementById("loginUsername").value.trim();
-
   const password = document.getElementById("loginPassword").value.trim();
 
   const msg = document.getElementById("msg");
@@ -97,6 +97,7 @@ async function login() {
   }
 
   try {
+    // Login request
     const res = await fetch(`${API_BASE_URL}/login`, {
       method: "POST",
       headers: {
@@ -111,20 +112,43 @@ async function login() {
 
     const data = await res.json();
 
-    if (res.status === 200) {
-      showMessage(msg, data.message, "green");
+    if (res.status !== 200) {
+      return showMessage(msg, data.message || "Login failed!");
+    }
 
-      document.getElementById("loginUsername").value = "";
-      document.getElementById("loginPassword").value = "";
+    showMessage(msg, "Login successful! Checking session...", "green");
+
+    // Clear fields
+    document.getElementById("loginUsername").value = "";
+    document.getElementById("loginPassword").value = "";
+
+    // IMPORTANT:
+    // Verify that Flask session was actually saved
+    const sessionRes = await fetch(`${API_BASE_URL}/check`, {
+      method: "GET",
+      credentials: "include",
+    });
+
+    const sessionData = await sessionRes.json();
+
+    console.log("Session check after login:", sessionData);
+
+    if (sessionData.user) {
+      showMessage(msg, "Login successful! Redirecting...", "green");
 
       setTimeout(() => {
         window.location.href = "index.html";
       }, 500);
     } else {
-      showMessage(msg, data.message || "Login failed!");
+      showMessage(
+        msg,
+        "Login successful, but session was not saved. Please try again.",
+      );
+
+      console.error("Login worked, but /check returned:", sessionData);
     }
   } catch (error) {
-    console.error(error);
+    console.error("Login Error:", error);
     showMessage(msg, "Server error!");
   }
 }
@@ -138,11 +162,17 @@ async function checkSession() {
       credentials: "include",
     });
 
+    if (!res.ok) {
+      return null;
+    }
+
     const data = await res.json();
+
+    console.log("Session:", data);
 
     return data.user || null;
   } catch (error) {
-    console.error(error);
+    console.error("Session Check Error:", error);
     return null;
   }
 }
@@ -155,7 +185,10 @@ async function requireLogin() {
   if (!user) {
     alert("Please login first!");
     window.location.href = "login.html";
+    return false;
   }
+
+  return true;
 }
 
 async function redirectIfLoggedIn() {
@@ -186,8 +219,8 @@ async function logout() {
     alert(data.message || "Logged out!");
 
     window.location.href = "login.html";
-  } catch (err) {
-    console.error(err);
+  } catch (error) {
+    console.error("Logout Error:", error);
     alert("Server error!");
   }
 }
