@@ -10,27 +10,26 @@ print("🔥 APP STARTED")
 
 app = Flask(__name__)
 
-# Secret key from environment variable
+# ---------------- SECRET KEY ----------------
 app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-key")
 
-# CORS
+# ---------------- CORS ----------------
 CORS(
     app,
     supports_credentials=True,
     origins=[
         "http://127.0.0.1:5500",
         "http://localhost:5500",
-        "http://127.0.0.1:5000",
-        "http://localhost:5000",
         "https://ai-stress-detection-system-mediapipe-1.onrender.com"
     ]
 )
 
-# Session settings
+# ---------------- SESSION SETTINGS ----------------
+# Required for frontend and backend running on different domains
 app.config.update(
     SESSION_COOKIE_HTTPONLY=True,
-    SESSION_COOKIE_SECURE=False,
-    SESSION_COOKIE_SAMESITE="Lax"
+    SESSION_COOKIE_SECURE=True,
+    SESSION_COOKIE_SAMESITE="None"
 )
 
 
@@ -38,6 +37,9 @@ app.config.update(
 @app.route("/register", methods=["POST"])
 def register():
     data = request.get_json()
+
+    if not data:
+        return jsonify({"message": "Invalid request"}), 400
 
     username = data.get("username")
     email = data.get("email")
@@ -47,34 +49,55 @@ def register():
         return jsonify({"message": "All fields required"}), 400
 
     conn = get_db_connection()
+
     if conn is None:
         return jsonify({"message": "Database connection failed"}), 500
 
-    cur = conn.cursor()
+    try:
+        cur = conn.cursor()
 
-    cur.execute(
-        "SELECT * FROM users WHERE username = %s OR email = %s",
-        (username, email)
-    )
-    user = cur.fetchone()
+        cur.execute(
+            "SELECT * FROM users WHERE username = %s OR email = %s",
+            (username, email)
+        )
 
-    if user:
-        cur.close()
-        conn.close()
-        return jsonify({"message": "User or Email already exists"}), 400
+        user = cur.fetchone()
 
-    hashed_password = generate_password_hash(password)
+        if user:
+            return jsonify({
+                "message": "User or Email already exists"
+            }), 400
 
-    cur.execute(
-        "INSERT INTO users (username, email, password) VALUES (%s, %s, %s)",
-        (username, email, hashed_password)
-    )
+        hashed_password = generate_password_hash(password)
 
-    conn.commit()
-    cur.close()
-    conn.close()
+        cur.execute(
+            """
+            INSERT INTO users (username, email, password)
+            VALUES (%s, %s, %s)
+            """,
+            (username, email, hashed_password)
+        )
 
-    return jsonify({"message": "Registered successfully"}), 201
+        conn.commit()
+
+        return jsonify({
+            "message": "Registered successfully"
+        }), 201
+
+    except Exception as e:
+        conn.rollback()
+        print("❌ Register Error:", e)
+
+        return jsonify({
+            "message": "Registration failed"
+        }), 500
+
+    finally:
+        try:
+            cur.close()
+            conn.close()
+        except Exception:
+            pass
 
 
 # ---------------- LOGIN ----------------
@@ -82,45 +105,90 @@ def register():
 def login():
     data = request.get_json()
 
+    if not data:
+        return jsonify({"message": "Invalid request"}), 400
+
     username = data.get("username")
     password = data.get("password")
 
+    if not username or not password:
+        return jsonify({"message": "All fields required"}), 400
+
     conn = get_db_connection()
+
     if conn is None:
-        return jsonify({"message": "Database connection failed"}), 500
+        return jsonify({
+            "message": "Database connection failed"
+        }), 500
 
-    cur = conn.cursor()
+    try:
+        cur = conn.cursor()
 
-    cur.execute(
-        "SELECT * FROM users WHERE username = %s OR email = %s",
-        (username, username)
-    )
-    user = cur.fetchone()
+        cur.execute(
+            "SELECT * FROM users WHERE username = %s OR email = %s",
+            (username, username)
+        )
 
-    cur.close()
-    conn.close()
+        user = cur.fetchone()
 
-    if user and check_password_hash(user[3], password):
-        session["user"] = user[1]
-        return jsonify({"message": "Login successful"}), 200
+        if user and check_password_hash(user[3], password):
+            session.clear()
+            session["user"] = user[1]
 
-    return jsonify({"message": "Invalid credentials"}), 401
+            return jsonify({
+                "message": "Login successful"
+            }), 200
+
+        return jsonify({
+            "message": "Invalid credentials"
+        }), 401
+
+    except Exception as e:
+        print("❌ Login Error:", e)
+
+        return jsonify({
+            "message": "Login failed"
+        }), 500
+
+    finally:
+        try:
+            cur.close()
+            conn.close()
+        except Exception:
+            pass
 
 
 # ---------------- LOGOUT ----------------
 @app.route("/logout", methods=["POST"])
 def logout():
-    session.pop("user", None)
-    return jsonify({"message": "Logged out"})
+    session.clear()
+
+    return jsonify({
+        "message": "Logged out"
+    }), 200
 
 
-# ---------------- CHECK ----------------
+# ---------------- CHECK SESSION ----------------
 @app.route("/check", methods=["GET"])
 def check():
-    if "user" in session:
-        return jsonify({"user": session["user"]})
+    user = session.get("user")
 
-    return jsonify({"user": None})
+    if user:
+        return jsonify({
+            "user": user
+        }), 200
+
+    return jsonify({
+        "user": None
+    }), 200
+
+
+# ---------------- HOME ----------------
+@app.route("/", methods=["GET"])
+def home():
+    return jsonify({
+        "message": "AI Stress Detection Backend is running"
+    }), 200
 
 
 # ---------------- RUN ----------------
