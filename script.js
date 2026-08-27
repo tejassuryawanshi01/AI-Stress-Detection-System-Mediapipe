@@ -1,4 +1,6 @@
-const API_BASE_URL = "https://ai-stress-detection-system-mediapipe-urkh.onrender.com";
+const API_BASE_URL =
+  "https://ai-stress-detection-system-mediapipe-urkh.onrender.com";
+
 // ---------------- ELEMENTS ----------------
 const video = document.getElementById("video");
 const canvas = document.getElementById("canvas");
@@ -16,60 +18,79 @@ const historyTable = document.getElementById("historyTable");
 
 const themeBtn = document.getElementById("themeBtn");
 const logoutBtn = document.getElementById("logoutBtn");
-const registerBtn = document.getElementById("registerBtn");
+const startBtn = document.getElementById("startBtn");
 
 // ---------------- THEME ----------------
-themeBtn.onclick = () => document.body.classList.toggle("light");
+if (themeBtn) {
+  themeBtn.onclick = () => {
+    document.body.classList.toggle("light");
+  };
+}
 
 // ---------------- VARIABLES ----------------
-let blinkCount = 0,
-  blinkState = false;
-let currentStress = 0,
-  smoothStress = 0;
+let blinkCount = 0;
+let blinkState = false;
+
+let currentStress = 0;
+let smoothStress = 0;
+
 let lastTime = performance.now();
 let camera = null;
 
-const stressData = [],
-  labels = [];
+const stressData = [];
+const labels = [];
+
 let lastGraphUpdate = 0;
 let isLoggedIn = false;
 
 // ---------------- CHART ----------------
-const chartCtx = document.getElementById("stressChart").getContext("2d");
+const chartElement = document.getElementById("stressChart");
 
-const stressChart = new Chart(chartCtx, {
-  type: "line",
-  data: {
-    labels,
-    datasets: [
-      {
-        data: stressData,
-        borderColor: "#00ffaa",
-        backgroundColor: "rgba(0,255,170,0.1)",
-        borderWidth: 3,
-        fill: true,
-        tension: 0.4,
+let stressChart = null;
+
+if (chartElement) {
+  const chartCtx = chartElement.getContext("2d");
+
+  stressChart = new Chart(chartCtx, {
+    type: "line",
+
+    data: {
+      labels: labels,
+
+      datasets: [
+        {
+          data: stressData,
+          borderColor: "#00ffaa",
+          backgroundColor: "rgba(0,255,170,0.1)",
+          borderWidth: 3,
+          fill: true,
+          tension: 0.4,
+        },
+      ],
+    },
+
+    options: {
+      animation: false,
+
+      plugins: {
+        legend: {
+          display: false,
+        },
       },
-    ],
-  },
-  options: {
-    animation: false,
-    plugins: {
-      legend: {
-        display: false,
+
+      scales: {
+        y: {
+          min: 0,
+          max: 100,
+        },
+
+        x: {
+          display: false,
+        },
       },
     },
-    scales: {
-      y: {
-        min: 0,
-        max: 100,
-      },
-      x: {
-        display: false,
-      },
-    },
-  },
-});
+  });
+}
 
 // ---------------- MEDIAPIPE ----------------
 const faceMesh = new FaceMesh({
@@ -88,18 +109,25 @@ faceMesh.onResults((results) => {
   if (!isLoggedIn) return;
 
   const now = performance.now();
+
   const fps = Math.round(1000 / (now - lastTime));
+
   lastTime = now;
 
-  fpsText.innerText = "FPS: " + fps;
+  if (fpsText) {
+    fpsText.innerText = "FPS: " + fps;
+  }
 
   canvas.width = video.videoWidth;
   canvas.height = video.videoHeight;
 
   ctx.clearRect(0, 0, canvas.width, canvas.height);
+
   ctx.drawImage(results.image, 0, 0, canvas.width, canvas.height);
 
-  if (!results.multiFaceLandmarks) return;
+  if (!results.multiFaceLandmarks) {
+    return;
+  }
 
   const landmarks = results.multiFaceLandmarks[0];
 
@@ -130,7 +158,10 @@ function detectBlink(landmarks) {
   if (dist < 0.012 && !blinkState) {
     blinkCount++;
     blinkState = true;
-    blinkText.innerText = blinkCount;
+
+    if (blinkText) {
+      blinkText.innerText = blinkCount;
+    }
   } else if (dist >= 0.012) {
     blinkState = false;
   }
@@ -138,6 +169,8 @@ function detectBlink(landmarks) {
 
 // ---------------- EMOTION ----------------
 function detectEmotion() {
+  if (!emotionText || !emoji) return;
+
   if (currentStress > 80) {
     emotionText.innerText = "Very Stressed";
     emoji.innerText = "😫";
@@ -163,6 +196,7 @@ function calculateStress(landmarks) {
   const mouthOpen = Math.abs(landmarks[13].y - landmarks[14].y);
 
   const eyeScore = eyeOpen < 0.015 ? 50 : 10;
+
   const mouthScore = mouthOpen > 0.04 ? 40 : 10;
 
   const rawStress = (eyeScore + mouthScore) / 2;
@@ -174,14 +208,23 @@ function calculateStress(landmarks) {
 
 // ---------------- GAUGE ----------------
 function updateGauge(percent) {
+  if (!gaugeFill || !gaugeText) {
+    return;
+  }
+
   const angle = (Math.max(0, Math.min(100, percent)) / 100) * 180 - 90;
 
   gaugeFill.style.transform = `rotate(${angle}deg)`;
+
   gaugeText.innerText = percent + "%";
 }
 
 // ---------------- GRAPH ----------------
 function updateGraph(value) {
+  if (!stressChart) {
+    return;
+  }
+
   stressData.push(value);
   labels.push("");
 
@@ -196,6 +239,7 @@ function updateGraph(value) {
 // ---------------- HISTORY ----------------
 setInterval(() => {
   if (!isLoggedIn) return;
+  if (!historyTable) return;
 
   const row = historyTable.insertRow(1);
 
@@ -212,16 +256,21 @@ setInterval(() => {
 function startCamera() {
   if (!isLoggedIn) {
     alert("Please login first!");
+    window.location.href = "login.html";
     return;
   }
 
-  if (camera) return;
+  if (camera) {
+    return;
+  }
 
   camera = new Camera(video, {
-    onFrame: async () =>
+    onFrame: async () => {
       await faceMesh.send({
         image: video,
-      }),
+      });
+    },
+
     width: 640,
     height: 480,
   });
@@ -229,15 +278,20 @@ function startCamera() {
   camera.start();
 }
 
+// ---------------- STOP CAMERA ----------------
 function stopCamera() {
   if (camera) {
     camera.stop();
     camera = null;
   }
 
-  video.pause();
+  if (video) {
+    video.pause();
+  }
 
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  if (ctx) {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  }
 }
 
 // ---------------- RESET ----------------
@@ -247,77 +301,113 @@ function resetData() {
   blinkCount = 0;
   currentStress = 0;
   smoothStress = 0;
+  blinkState = false;
 
-  blinkText.innerText = "0";
-  gaugeText.innerText = "0%";
-  emotionText.innerText = "Relaxed";
-  emoji.innerText = "😌";
+  if (blinkText) {
+    blinkText.innerText = "0";
+  }
+
+  if (gaugeText) {
+    gaugeText.innerText = "0%";
+  }
+
+  if (gaugeFill) {
+    gaugeFill.style.transform = "rotate(-90deg)";
+  }
+
+  if (emotionText) {
+    emotionText.innerText = "Relaxed";
+  }
+
+  if (emoji) {
+    emoji.innerText = "😌";
+  }
 
   stressData.length = 0;
   labels.length = 0;
 
-  stressChart.update();
+  if (stressChart) {
+    stressChart.update();
+  }
 
-  while (historyTable.rows.length > 1) {
-    historyTable.deleteRow(1);
+  if (historyTable) {
+    while (historyTable.rows.length > 1) {
+      historyTable.deleteRow(1);
+    }
   }
 }
 
 // ---------------- SESSION CHECK ----------------
-async function checkSession() {
+async function checkDashboardSession() {
   try {
     const res = await fetch(`${API_BASE_URL}/check`, {
       method: "GET",
       credentials: "include",
+      cache: "no-store",
     });
 
+    if (!res.ok) {
+      throw new Error("Session request failed");
+    }
+
     const data = await res.json();
+
+    console.log("Dashboard session:", data);
 
     if (data.user) {
       isLoggedIn = true;
 
-      logoutBtn.style.display = "inline-block";
-      registerBtn.style.display = "none";
+      if (logoutBtn) {
+        logoutBtn.style.display = "inline-block";
+      }
 
-      startCamera();
-    } else {
-      isLoggedIn = false;
+      if (startBtn) {
+        startBtn.style.display = "inline-block";
+      }
 
-      logoutBtn.style.display = "none";
-      registerBtn.style.display = "inline-block";
-
-      alert("Please login/register to access the dashboard!");
-
-      window.location.href = "login.html";
+      return;
     }
-  } catch (err) {
-    console.error(err);
+
+    isLoggedIn = false;
+
+    if (logoutBtn) {
+      logoutBtn.style.display = "none";
+    }
+
+    window.location.replace("login.html");
+  } catch (error) {
+    console.error("Session Check Error:", error);
+
+    isLoggedIn = false;
+
+    window.location.replace("login.html");
   }
 }
 
 // ---------------- LOGOUT ----------------
-logoutBtn.onclick = async () => {
-  try {
-    await fetch(`${API_BASE_URL}/logout`, {
-      method: "POST",
-      credentials: "include",
-    });
+if (logoutBtn) {
+  logoutBtn.onclick = async () => {
+    try {
+      await fetch(`${API_BASE_URL}/logout`, {
+        method: "POST",
+        credentials: "include",
+      });
+    } catch (error) {
+      console.error("Logout Error:", error);
+    }
 
     isLoggedIn = false;
 
     stopCamera();
     resetData();
 
-    logoutBtn.style.display = "none";
-    registerBtn.style.display = "inline-block";
-
-    alert("Logged out successfully!");
-
-    window.location.href = "login.html";
-  } catch (err) {
-    console.error(err);
-  }
-};
+    window.location.replace("login.html");
+  };
+}
 
 // ---------------- INIT ----------------
-document.addEventListener("DOMContentLoaded", checkSession);
+document.addEventListener("DOMContentLoaded", () => {
+  if (document.body.id === "dashboardPage") {
+    checkDashboardSession();
+  }
+});
