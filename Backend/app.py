@@ -25,11 +25,12 @@ CORS(
 )
 
 # ---------------- SESSION SETTINGS ----------------
-# Required for frontend and backend running on different domains
 app.config.update(
+    SESSION_COOKIE_NAME="stress_session",
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SECURE=True,
-    SESSION_COOKIE_SAMESITE="None"
+    SESSION_COOKIE_SAMESITE="None",
+    SESSION_COOKIE_PATH="/"
 )
 
 
@@ -52,6 +53,8 @@ def register():
 
     if conn is None:
         return jsonify({"message": "Database connection failed"}), 500
+
+    cur = None
 
     try:
         cur = conn.cursor()
@@ -93,11 +96,9 @@ def register():
         }), 500
 
     finally:
-        try:
+        if cur:
             cur.close()
-            conn.close()
-        except Exception:
-            pass
+        conn.close()
 
 
 # ---------------- LOGIN ----------------
@@ -121,6 +122,8 @@ def login():
             "message": "Database connection failed"
         }), 500
 
+    cur = None
+
     try:
         cur = conn.cursor()
 
@@ -132,11 +135,17 @@ def login():
         user = cur.fetchone()
 
         if user and check_password_hash(user[3], password):
+
+            # Create new session
             session.clear()
             session["user"] = user[1]
 
+            print("✅ LOGIN SUCCESS:", user[1])
+            print("✅ SESSION USER:", session.get("user"))
+
             return jsonify({
-                "message": "Login successful"
+                "message": "Login successful",
+                "user": user[1]
             }), 200
 
         return jsonify({
@@ -151,12 +160,9 @@ def login():
         }), 500
 
     finally:
-        try:
+        if cur:
             cur.close()
-            conn.close()
-        except Exception:
-            pass
-
+        conn.close()
 
 # ---------------- LOGOUT ----------------
 @app.route("/logout", methods=["POST"])
@@ -167,11 +173,12 @@ def logout():
         "message": "Logged out"
     }), 200
 
-
 # ---------------- CHECK SESSION ----------------
 @app.route("/check", methods=["GET"])
 def check():
     user = session.get("user")
+
+    print("🔍 CHECK SESSION:", user)
 
     if user:
         return jsonify({
@@ -182,14 +189,12 @@ def check():
         "user": None
     }), 200
 
-
 # ---------------- HOME ----------------
 @app.route("/", methods=["GET"])
 def home():
     return jsonify({
         "message": "AI Stress Detection Backend is running"
     }), 200
-
 
 # ---------------- RUN ----------------
 if __name__ == "__main__":
