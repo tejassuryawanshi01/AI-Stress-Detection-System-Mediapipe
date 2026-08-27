@@ -22,7 +22,9 @@ function showMessage(msgElem, text, color = "red") {
 
 async function register() {
   const username = document.getElementById("username").value.trim();
+
   const email = document.getElementById("email").value.trim();
+
   const password = document.getElementById("password").value.trim();
 
   const msg = document.getElementById("msg");
@@ -52,10 +54,13 @@ async function register() {
   try {
     const res = await fetch(`${API_BASE_URL}/register`, {
       method: "POST",
+
       headers: {
         "Content-Type": "application/json",
       },
+
       credentials: "include",
+
       body: JSON.stringify({
         username,
         email,
@@ -69,7 +74,9 @@ async function register() {
       showMessage(msg, data.message, "green");
 
       document.getElementById("username").value = "";
+
       document.getElementById("email").value = "";
+
       document.getElementById("password").value = "";
 
       setTimeout(() => {
@@ -80,6 +87,7 @@ async function register() {
     }
   } catch (error) {
     console.error("Register Error:", error);
+
     showMessage(msg, "Server error!");
   }
 }
@@ -88,6 +96,7 @@ async function register() {
 
 async function login() {
   const username = document.getElementById("loginUsername").value.trim();
+
   const password = document.getElementById("loginPassword").value.trim();
 
   const msg = document.getElementById("msg");
@@ -97,13 +106,15 @@ async function login() {
   }
 
   try {
-    // Login request
     const res = await fetch(`${API_BASE_URL}/login`, {
       method: "POST",
+
       headers: {
         "Content-Type": "application/json",
       },
+
       credentials: "include",
+
       body: JSON.stringify({
         username,
         password,
@@ -116,93 +127,27 @@ async function login() {
       return showMessage(msg, data.message || "Login failed!");
     }
 
-    showMessage(msg, "Login successful! Checking session...", "green");
+    showMessage(msg, "Login successful!", "green");
 
-    // Clear fields
     document.getElementById("loginUsername").value = "";
+
     document.getElementById("loginPassword").value = "";
 
-    // IMPORTANT:
-    // Verify that Flask session was actually saved
-    const sessionRes = await fetch(`${API_BASE_URL}/check`, {
-      method: "GET",
-      credentials: "include",
-    });
+    /*
+      Do NOT check /check here.
 
-    const sessionData = await sessionRes.json();
+      Backend has already confirmed the login.
+      Go directly to the dashboard.
+    */
 
-    console.log("Session check after login:", sessionData);
-
-    if (sessionData.user) {
-      showMessage(msg, "Login successful! Redirecting...", "green");
-
-      setTimeout(() => {
-        window.location.href = "index.html";
-      }, 500);
-    } else {
-      showMessage(
-        msg,
-        "Login successful, but session was not saved. Please try again.",
-      );
-
-      console.error("Login worked, but /check returned:", sessionData);
-    }
+    setTimeout(() => {
+      window.location.href = "index.html";
+    }, 500);
   } catch (error) {
     console.error("Login Error:", error);
+
     showMessage(msg, "Server error!");
   }
-}
-
-// ---------------- SESSION CHECK ----------------
-
-async function checkSession() {
-  try {
-    const res = await fetch(`${API_BASE_URL}/check`, {
-      method: "GET",
-      credentials: "include",
-    });
-
-    if (!res.ok) {
-      return null;
-    }
-
-    const data = await res.json();
-
-    console.log("Session:", data);
-
-    return data.user || null;
-  } catch (error) {
-    console.error("Session Check Error:", error);
-    return null;
-  }
-}
-
-// ---------------- REDIRECT HELPERS ----------------
-
-async function requireLogin() {
-  const user = await checkSession();
-
-  if (!user) {
-    alert("Please login first!");
-    window.location.href = "login.html";
-    return false;
-  }
-
-  return true;
-}
-
-async function redirectIfLoggedIn() {
-  const user = await checkSession();
-
-  if (user) {
-    window.location.href = "index.html";
-  }
-}
-
-// ---------------- AUTO REDIRECT ----------------
-
-if (document.body.id === "loginPage" || document.body.id === "registerPage") {
-  redirectIfLoggedIn();
 }
 
 // ---------------- LOGOUT ----------------
@@ -216,11 +161,10 @@ async function logout() {
 
     const data = await res.json();
 
-    alert(data.message || "Logged out!");
-
-    window.location.href = "login.html";
+    console.log("Logout:", data);
   } catch (error) {
     console.error("Logout Error:", error);
-    alert("Server error!");
   }
+
+  window.location.replace("login.html");
 }
