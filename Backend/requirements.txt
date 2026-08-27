@@ -3,3 +3,4 @@ flask-cors
 werkzeug
 gunicorn
 psycopg2-binary
+python-dotenv

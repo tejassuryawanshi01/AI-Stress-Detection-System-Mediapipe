@@ -1,14 +1,37 @@
+import os
+
 from flask import Flask, request, jsonify, session
 from flask_cors import CORS
 from werkzeug.security import generate_password_hash, check_password_hash
 
 from database import get_db_connection
+
 print("🔥 APP STARTED")
 
 app = Flask(__name__)
-CORS(app, supports_credentials=True)
 
-app.secret_key = "secret123"
+# Secret key from environment variable
+app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-key")
+
+# CORS
+CORS(
+    app,
+    supports_credentials=True,
+    origins=[
+        "http://127.0.0.1:5500",
+        "http://localhost:5500",
+        "http://127.0.0.1:5000",
+        "http://localhost:5000",
+        "https://your-frontend.onrender.com"
+    ]
+)
+
+# Session settings
+app.config.update(
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SECURE=False,
+    SESSION_COOKIE_SAMESITE="Lax"
+)
 
 
 # ---------------- REGISTER ----------------
@@ -29,8 +52,10 @@ def register():
 
     cur = conn.cursor()
 
-    # Check existing user/email
-    cur.execute("SELECT * FROM users WHERE username = %s OR email = %s", (username, email))
+    cur.execute(
+        "SELECT * FROM users WHERE username = %s OR email = %s",
+        (username, email)
+    )
     user = cur.fetchone()
 
     if user:
@@ -57,7 +82,7 @@ def register():
 def login():
     data = request.get_json()
 
-    username = data.get("username")  # or email
+    username = data.get("username")
     password = data.get("password")
 
     conn = get_db_connection()
@@ -66,15 +91,17 @@ def login():
 
     cur = conn.cursor()
 
-    # login using username OR email
-    cur.execute("SELECT * FROM users WHERE username = %s OR email = %s", (username, username))
+    cur.execute(
+        "SELECT * FROM users WHERE username = %s OR email = %s",
+        (username, username)
+    )
     user = cur.fetchone()
 
     cur.close()
     conn.close()
 
     if user and check_password_hash(user[3], password):
-        session["user"] = user[1]   # username
+        session["user"] = user[1]
         return jsonify({"message": "Login successful"}), 200
 
     return jsonify({"message": "Invalid credentials"}), 401
@@ -92,10 +119,16 @@ def logout():
 def check():
     if "user" in session:
         return jsonify({"user": session["user"]})
+
     return jsonify({"user": None})
 
 
 # ---------------- RUN ----------------
 if __name__ == "__main__":
     print("🚀 Server started")
-    app.run(debug=True)
+
+    app.run(
+        host="0.0.0.0",
+        port=int(os.environ.get("PORT", 5000)),
+        debug=False
+    )
