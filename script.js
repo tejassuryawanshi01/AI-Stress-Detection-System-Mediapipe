@@ -3,26 +3,37 @@ const API_BASE_URL =
 
 const AUTH_TOKEN_KEY = "stress_auth_token";
 
-// ---------------- ELEMENTS ----------------
+// =========================================================
+// ELEMENTS
+// =========================================================
 
 const video = document.getElementById("video");
+
 const canvas = document.getElementById("canvas");
+
 const ctx = canvas.getContext("2d");
 
 const blinkText = document.getElementById("blinkCount");
+
 const emotionText = document.getElementById("emotionText");
+
 const emoji = document.getElementById("emoji");
 
 const gaugeFill = document.getElementById("gaugeFill");
+
 const gaugeText = document.getElementById("gaugeText");
 
 const fpsText = document.getElementById("fps");
+
 const historyTable = document.getElementById("historyTable");
 
 const themeBtn = document.getElementById("themeBtn");
+
 const logoutBtn = document.getElementById("logoutBtn");
 
-// ---------------- THEME ----------------
+// =========================================================
+// THEME
+// =========================================================
 
 if (themeBtn) {
   themeBtn.onclick = () => {
@@ -30,30 +41,41 @@ if (themeBtn) {
   };
 }
 
-// ---------------- VARIABLES ----------------
+// =========================================================
+// VARIABLES
+// =========================================================
 
 let blinkCount = 0;
+
 let blinkState = false;
 
 let currentStress = 0;
+
 let smoothStress = 0;
 
 let lastTime = performance.now();
+
 let camera = null;
 
-const stressData = [];
-const labels = [];
-
-let lastGraphUpdate = 0;
 let isLoggedIn = false;
 
-// ---------------- AUTH TOKEN ----------------
+let lastGraphUpdate = 0;
+
+const stressData = [];
+
+const labels = [];
+
+// =========================================================
+// GET TOKEN
+// =========================================================
 
 function getAuthToken() {
   return localStorage.getItem(AUTH_TOKEN_KEY);
 }
 
-// ---------------- CHART ----------------
+// =========================================================
+// CHART
+// =========================================================
 
 const chartElement = document.getElementById("stressChart");
 
@@ -71,10 +93,15 @@ if (chartElement) {
       datasets: [
         {
           data: stressData,
+
           borderColor: "#00ffaa",
+
           backgroundColor: "rgba(0,255,170,0.1)",
+
           borderWidth: 3,
+
           fill: true,
+
           tension: 0.4,
         },
       ],
@@ -103,7 +130,9 @@ if (chartElement) {
   });
 }
 
-// ---------------- MEDIAPIPE ----------------
+// =========================================================
+// MEDIAPIPE
+// =========================================================
 
 const faceMesh = new FaceMesh({
   locateFile: (file) =>
@@ -112,8 +141,11 @@ const faceMesh = new FaceMesh({
 
 faceMesh.setOptions({
   maxNumFaces: 1,
+
   refineLandmarks: true,
+
   minDetectionConfidence: 0.5,
+
   minTrackingConfidence: 0.5,
 });
 
@@ -130,6 +162,10 @@ faceMesh.onResults((results) => {
 
   if (fpsText) {
     fpsText.innerText = "FPS: " + fps;
+  }
+
+  if (!video.videoWidth || !video.videoHeight) {
+    return;
   }
 
   canvas.width = video.videoWidth;
@@ -166,7 +202,9 @@ faceMesh.onResults((results) => {
   }
 });
 
-// ---------------- BLINK ----------------
+// =========================================================
+// BLINK
+// =========================================================
 
 function detectBlink(landmarks) {
   const eyeTop = landmarks[159];
@@ -188,7 +226,9 @@ function detectBlink(landmarks) {
   }
 }
 
-// ---------------- EMOTION ----------------
+// =========================================================
+// EMOTION
+// =========================================================
 
 function detectEmotion() {
   if (!emotionText || !emoji) {
@@ -218,7 +258,9 @@ function detectEmotion() {
   }
 }
 
-// ---------------- STRESS CALC ----------------
+// =========================================================
+// STRESS
+// =========================================================
 
 function calculateStress(landmarks) {
   const eyeOpen = Math.abs(landmarks[159].y - landmarks[145].y);
@@ -236,7 +278,9 @@ function calculateStress(landmarks) {
   currentStress = Math.min(100, Math.floor(smoothStress));
 }
 
-// ---------------- GAUGE ----------------
+// =========================================================
+// GAUGE
+// =========================================================
 
 function updateGauge(percent) {
   if (!gaugeFill || !gaugeText) {
@@ -250,7 +294,9 @@ function updateGauge(percent) {
   gaugeText.innerText = percent + "%";
 }
 
-// ---------------- GRAPH ----------------
+// =========================================================
+// GRAPH
+// =========================================================
 
 function updateGraph(value) {
   if (!stressChart) {
@@ -270,7 +316,9 @@ function updateGraph(value) {
   stressChart.update();
 }
 
-// ---------------- HISTORY ----------------
+// =========================================================
+// HISTORY
+// =========================================================
 
 setInterval(() => {
   if (!isLoggedIn) {
@@ -292,7 +340,9 @@ setInterval(() => {
   }
 }, 5000);
 
-// ---------------- CAMERA ----------------
+// =========================================================
+// START CAMERA
+// =========================================================
 
 function startCamera() {
   if (!isLoggedIn) {
@@ -315,13 +365,16 @@ function startCamera() {
     },
 
     width: 640,
+
     height: 480,
   });
 
   camera.start();
 }
 
-// ---------------- STOP CAMERA ----------------
+// =========================================================
+// STOP CAMERA
+// =========================================================
 
 function stopCamera() {
   if (camera) {
@@ -339,7 +392,9 @@ function stopCamera() {
   }
 }
 
-// ---------------- RESET ----------------
+// =========================================================
+// RESET
+// =========================================================
 
 function resetData() {
   stopCamera();
@@ -387,12 +442,14 @@ function resetData() {
   }
 }
 
-// ---------------- SESSION CHECK ----------------
+// =========================================================
+// CHECK DASHBOARD AUTH
+// =========================================================
 
 async function checkDashboardSession() {
   const token = getAuthToken();
 
-  // No token = not logged in
+  // No token
   if (!token) {
     isLoggedIn = false;
 
@@ -426,7 +483,8 @@ async function checkDashboardSession() {
       return;
     }
 
-    // Invalid / expired token
+    // Invalid token
+
     localStorage.removeItem(AUTH_TOKEN_KEY);
 
     localStorage.removeItem("stress_username");
@@ -443,7 +501,9 @@ async function checkDashboardSession() {
   }
 }
 
-// ---------------- LOGOUT ----------------
+// =========================================================
+// LOGOUT
+// =========================================================
 
 if (logoutBtn) {
   logoutBtn.onclick = async () => {
@@ -455,7 +515,6 @@ if (logoutBtn) {
       console.error("Logout Error:", error);
     }
 
-    // Remove JWT
     localStorage.removeItem(AUTH_TOKEN_KEY);
 
     localStorage.removeItem("stress_username");
@@ -464,13 +523,13 @@ if (logoutBtn) {
 
     stopCamera();
 
-    resetData();
-
     window.location.replace("login.html");
   };
 }
 
-// ---------------- INIT ----------------
+// =========================================================
+// INIT
+// =========================================================
 
 document.addEventListener("DOMContentLoaded", () => {
   if (document.body.id === "dashboardPage") {

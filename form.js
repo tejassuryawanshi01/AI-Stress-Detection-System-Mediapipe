@@ -1,17 +1,13 @@
-// ---------------- API BASE ----------------
-
 const API_BASE_URL =
   "https://ai-stress-detection-system-mediapipe-urkh.onrender.com";
 
-// ---------------- REGEX PATTERNS ----------------
+const AUTH_TOKEN_KEY = "stress_auth_token";
 
-const usernameRegex = /^[a-zA-Z0-9_]{3,20}$/;
+const USERNAME_KEY = "stress_username";
 
-const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-const passwordRegex = /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{6,}$/;
-
-// ---------------- MESSAGE HELPER ----------------
+// =========================================================
+// MESSAGE
+// =========================================================
 
 function showMessage(msgElem, text, color = "red") {
   if (!msgElem) return;
@@ -20,7 +16,9 @@ function showMessage(msgElem, text, color = "red") {
   msgElem.style.color = color;
 }
 
-// ---------------- REGISTER ----------------
+// =========================================================
+// REGISTER
+// =========================================================
 
 async function register() {
   const username = document.getElementById("username").value.trim();
@@ -33,24 +31,6 @@ async function register() {
 
   if (!username || !email || !password) {
     return showMessage(msg, "All fields are required!");
-  }
-
-  if (!usernameRegex.test(username)) {
-    return showMessage(
-      msg,
-      "Username must be 3-20 characters, letters/numbers/_ only.",
-    );
-  }
-
-  if (!emailRegex.test(email)) {
-    return showMessage(msg, "Invalid email format!");
-  }
-
-  if (!passwordRegex.test(password)) {
-    return showMessage(
-      msg,
-      "Password must be at least 6 characters with 1 letter and 1 number.",
-    );
   }
 
   try {
@@ -80,7 +60,7 @@ async function register() {
       document.getElementById("password").value = "";
 
       setTimeout(() => {
-        window.location.href = "login.html";
+        window.location.replace("login.html");
       }, 1000);
     } else {
       showMessage(msg, data.message || "Registration failed!");
@@ -92,7 +72,9 @@ async function register() {
   }
 }
 
-// ---------------- LOGIN ----------------
+// =========================================================
+// LOGIN
+// =========================================================
 
 async function login() {
   const username = document.getElementById("loginUsername").value.trim();
@@ -125,20 +107,17 @@ async function login() {
       return showMessage(msg, data.message || "Login failed!");
     }
 
-    // ---------------- SAVE JWT TOKEN ----------------
-
     if (!data.token) {
-      console.error("❌ No token received from backend");
+      console.error("❌ No authentication token received");
 
-      return showMessage(
-        msg,
-        "Login successful, but authentication token was not received.",
-      );
+      return showMessage(msg, "Login successful, but token was not received.");
     }
 
-    localStorage.setItem("stress_auth_token", data.token);
+    // SAVE TOKEN
+    localStorage.setItem(AUTH_TOKEN_KEY, data.token);
 
-    localStorage.setItem("stress_username", data.user);
+    // SAVE USERNAME
+    localStorage.setItem(USERNAME_KEY, data.user || username);
 
     console.log("✅ Login successful");
 
@@ -160,7 +139,9 @@ async function login() {
   }
 }
 
-// ---------------- LOGOUT ----------------
+// =========================================================
+// LOGOUT
+// =========================================================
 
 async function logout() {
   try {
@@ -171,10 +152,9 @@ async function logout() {
     console.error("Logout Error:", error);
   }
 
-  // Remove authentication
-  localStorage.removeItem("stress_auth_token");
+  localStorage.removeItem(AUTH_TOKEN_KEY);
 
-  localStorage.removeItem("stress_username");
+  localStorage.removeItem(USERNAME_KEY);
 
   window.location.replace("login.html");
 }

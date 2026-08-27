@@ -12,6 +12,10 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from database import get_db_connection
 
 
+# =========================================================
+# SIMPLE JWT IMPLEMENTATION
+# =========================================================
+
 class _JWTError(Exception):
     pass
 
@@ -25,68 +29,189 @@ class _InvalidTokenError(_JWTError):
 
 
 class _JWT:
+
     ExpiredSignatureError = _ExpiredSignatureError
     InvalidTokenError = _InvalidTokenError
 
     @staticmethod
     def _encode_part(value):
+
         return base64.urlsafe_b64encode(
-            json.dumps(value, separators=(",", ":")).encode("utf-8")
+            json.dumps(
+                value,
+                separators=(",", ":")
+            ).encode("utf-8")
         ).rstrip(b"=").decode("ascii")
+
 
     @staticmethod
     def _decode_part(value):
-        return json.loads(base64.urlsafe_b64decode(value + "=" * (-len(value) % 4)))
 
-    def encode(self, payload, key, algorithm="HS256"):
+        return json.loads(
+            base64.urlsafe_b64decode(
+                value +
+                "=" * (-len(value) % 4)
+            )
+        )
+
+
+    def encode(
+        self,
+        payload,
+        key,
+        algorithm="HS256"
+    ):
+
         if algorithm != "HS256":
-            raise _InvalidTokenError("Unsupported algorithm")
-        header = self._encode_part({"alg": "HS256", "typ": "JWT"})
-        body = self._encode_part(payload)
-        message = f"{header}.{body}".encode("ascii")
-        signature = hmac.new(key.encode("utf-8"), message, hashlib.sha256).digest()
-        encoded_signature = base64.urlsafe_b64encode(signature).rstrip(b"=").decode("ascii")
-        return f"{header}.{body}.{encoded_signature}"
+            raise _InvalidTokenError(
+                "Unsupported algorithm"
+            )
 
-    def decode(self, token, key, algorithms=None):
+        header = self._encode_part({
+            "alg": "HS256",
+            "typ": "JWT"
+        })
+
+        body = self._encode_part(
+            payload
+        )
+
+        message = (
+            f"{header}.{body}"
+        ).encode("ascii")
+
+        signature = hmac.new(
+            key.encode("utf-8"),
+            message,
+            hashlib.sha256
+        ).digest()
+
+        encoded_signature = (
+            base64.urlsafe_b64encode(
+                signature
+            )
+            .rstrip(b"=")
+            .decode("ascii")
+        )
+
+        return (
+            f"{header}.{body}."
+            f"{encoded_signature}"
+        )
+
+
+    def decode(
+        self,
+        token,
+        key,
+        algorithms=None
+    ):
+
         try:
-            header_text, body_text, signature_text = token.split(".")
-            header = self._decode_part(header_text)
-            if algorithms and header.get("alg") not in algorithms:
-                raise _InvalidTokenError("Unsupported algorithm")
+
+            header_text, body_text, signature_text = (
+                token.split(".")
+            )
+
+            header = self._decode_part(
+                header_text
+            )
+
+            if (
+                algorithms and
+                header.get("alg")
+                not in algorithms
+            ):
+                raise _InvalidTokenError(
+                    "Unsupported algorithm"
+                )
+
             expected = hmac.new(
                 key.encode("utf-8"),
                 f"{header_text}.{body_text}".encode("ascii"),
-                hashlib.sha256,
+                hashlib.sha256
             ).digest()
+
             actual = base64.urlsafe_b64decode(
-                signature_text + "=" * (-len(signature_text) % 4)
+                signature_text +
+                "=" * (-len(signature_text) % 4)
             )
-            if not hmac.compare_digest(actual, expected):
-                raise _InvalidTokenError("Invalid signature")
-            payload = self._decode_part(body_text)
-            if payload.get("exp", 0) < datetime.now(timezone.utc).timestamp():
-                raise _ExpiredSignatureError("Token expired")
+
+            if not hmac.compare_digest(
+                actual,
+                expected
+            ):
+                raise _InvalidTokenError(
+                    "Invalid signature"
+                )
+
+            payload = self._decode_part(
+                body_text
+            )
+
+            if (
+                payload.get("exp", 0)
+                <
+                datetime.now(
+                    timezone.utc
+                ).timestamp()
+            ):
+                raise _ExpiredSignatureError(
+                    "Token expired"
+                )
+
             return payload
-        except (_ExpiredSignatureError, _InvalidTokenError):
+
+        except (
+            _ExpiredSignatureError,
+            _InvalidTokenError
+        ):
             raise
-        except (ValueError, TypeError, KeyError, json.JSONDecodeError):
-            raise _InvalidTokenError("Invalid token")
+
+        except (
+            ValueError,
+            TypeError,
+            KeyError,
+            json.JSONDecodeError
+        ):
+            raise _InvalidTokenError(
+                "Invalid token"
+            )
 
 
 jwt = _JWT()
+
+
+# =========================================================
+# APP
+# =========================================================
 
 print("🔥 APP STARTED")
 
 app = Flask(__name__)
 
-# ---------------- SECRET KEY ----------------
+
+# =========================================================
+# SECRET KEY
+# =========================================================
+
 SECRET_KEY = os.environ.get(
-    "SECRET_KEY",
-    "dev-secret-key"
+    "SECRET_KEY"
 )
 
-# ---------------- CORS ----------------
+if not SECRET_KEY:
+
+    print(
+        "⚠️ WARNING: SECRET_KEY is not set in environment."
+    )
+
+    SECRET_KEY = "dev-secret-key"
+
+
+# =========================================================
+# CORS
+# =========================================================
+
 CORS(
     app,
     supports_credentials=True,
@@ -98,37 +223,56 @@ CORS(
 )
 
 
-# ---------------- CREATE TOKEN ----------------
+# =========================================================
+# CREATE TOKEN
+# =========================================================
+
 def create_token(username):
 
     payload = {
+
         "user": username,
-        "exp": datetime.now(timezone.utc) + timedelta(days=7)
+
+        "exp":
+            datetime.now(
+                timezone.utc
+            )
+            +
+            timedelta(days=7)
     }
 
-    token = jwt.encode(
+    return jwt.encode(
         payload,
         SECRET_KEY,
         algorithm="HS256"
     )
 
-    return token
 
+# =========================================================
+# VERIFY TOKEN
+# =========================================================
 
-# ---------------- VERIFY TOKEN ----------------
 def verify_token():
 
-    auth_header = request.headers.get("Authorization")
+    auth_header = request.headers.get(
+        "Authorization"
+    )
 
     if not auth_header:
         return None
 
-    if not auth_header.startswith("Bearer "):
+    if not auth_header.startswith(
+        "Bearer "
+    ):
         return None
 
-    token = auth_header.split(" ", 1)[1]
+    token = auth_header.split(
+        " ",
+        1
+    )[1]
 
     try:
+
         payload = jwt.decode(
             token,
             SECRET_KEY,
@@ -138,40 +282,76 @@ def verify_token():
         return payload.get("user")
 
     except jwt.ExpiredSignatureError:
-        print("❌ Token expired")
+
+        print(
+            "❌ Token expired"
+        )
+
         return None
 
     except jwt.InvalidTokenError:
-        print("❌ Invalid token")
+
+        print(
+            "❌ Invalid token"
+        )
+
         return None
 
 
-# ---------------- REGISTER ----------------
-@app.route("/register", methods=["POST"])
+# =========================================================
+# REGISTER
+# =========================================================
+
+@app.route(
+    "/register",
+    methods=["POST"]
+)
 def register():
 
     data = request.get_json()
 
     if not data:
+
         return jsonify({
-            "message": "Invalid request"
+            "message":
+                "Invalid request"
         }), 400
 
-    username = data.get("username")
-    email = data.get("email")
-    password = data.get("password")
 
-    if not username or not email or not password:
+    username = data.get(
+        "username"
+    )
+
+    email = data.get(
+        "email"
+    )
+
+    password = data.get(
+        "password"
+    )
+
+
+    if (
+        not username
+        or not email
+        or not password
+    ):
+
         return jsonify({
-            "message": "All fields required"
+            "message":
+                "All fields required"
         }), 400
+
 
     conn = get_db_connection()
 
     if conn is None:
+
         return jsonify({
-            "message": "Database connection failed"
+            "message":
+                "Database connection failed"
         }), 500
+
 
     cur = None
 
@@ -179,24 +359,38 @@ def register():
 
         cur = conn.cursor()
 
+
         cur.execute(
             """
-            SELECT * FROM users
-            WHERE username = %s OR email = %s
+            SELECT *
+            FROM users
+            WHERE username = %s
+            OR email = %s
             """,
-            (username, email)
+            (
+                username,
+                email
+            )
         )
+
 
         user = cur.fetchone()
 
+
         if user:
+
             return jsonify({
-                "message": "User or Email already exists"
+                "message":
+                    "User or Email already exists"
             }), 400
 
-        hashed_password = generate_password_hash(
-            password
+
+        hashed_password = (
+            generate_password_hash(
+                password
+            )
         )
+
 
         cur.execute(
             """
@@ -211,16 +405,21 @@ def register():
             )
         )
 
+
         conn.commit()
+
 
         print(
             "✅ USER REGISTERED:",
             username
         )
 
+
         return jsonify({
-            "message": "Registered successfully"
+            "message":
+                "Registered successfully"
         }), 201
+
 
     except Exception as e:
 
@@ -232,8 +431,10 @@ def register():
         )
 
         return jsonify({
-            "message": "Registration failed"
+            "message":
+                "Registration failed"
         }), 500
+
 
     finally:
 
@@ -243,74 +444,124 @@ def register():
         conn.close()
 
 
-# ---------------- LOGIN ----------------
-@app.route("/login", methods=["POST"])
+# =========================================================
+# LOGIN
+# =========================================================
+
+@app.route(
+    "/login",
+    methods=["POST"]
+)
 def login():
 
     data = request.get_json()
 
     if not data:
+
         return jsonify({
-            "message": "Invalid request"
+            "message":
+                "Invalid request"
         }), 400
 
-    username = data.get("username")
-    password = data.get("password")
 
-    if not username or not password:
+    username = data.get(
+        "username"
+    )
+
+    password = data.get(
+        "password"
+    )
+
+
+    if (
+        not username
+        or not password
+    ):
+
         return jsonify({
-            "message": "All fields required"
+            "message":
+                "All fields required"
         }), 400
+
 
     conn = get_db_connection()
 
     if conn is None:
+
         return jsonify({
-            "message": "Database connection failed"
+            "message":
+                "Database connection failed"
         }), 500
 
+
     cur = None
+
 
     try:
 
         cur = conn.cursor()
 
+
         cur.execute(
             """
-            SELECT * FROM users
-            WHERE username = %s OR email = %s
+            SELECT *
+            FROM users
+            WHERE username = %s
+            OR email = %s
             """,
-            (username, username)
+            (
+                username,
+                username
+            )
         )
+
 
         user = cur.fetchone()
 
+
         if not user:
+
             return jsonify({
-                "message": "Invalid credentials"
+                "message":
+                    "Invalid credentials"
             }), 401
+
 
         if not check_password_hash(
             user[3],
             password
         ):
+
             return jsonify({
-                "message": "Invalid credentials"
+                "message":
+                    "Invalid credentials"
             }), 401
 
-        # Create JWT token
-        token = create_token(user[1])
+
+        token = create_token(
+            user[1]
+        )
+
 
         print(
             "✅ LOGIN SUCCESS:",
             user[1]
         )
 
+
         return jsonify({
-            "message": "Login successful",
-            "user": user[1],
-            "token": token
+
+            "message":
+                "Login successful",
+
+            "user":
+                user[1],
+
+            "token":
+                token
+
         }), 200
+
 
     except Exception as e:
 
@@ -320,8 +571,10 @@ def login():
         )
 
         return jsonify({
-            "message": "Login failed"
+            "message":
+                "Login failed"
         }), 500
+
 
     finally:
 
@@ -331,54 +584,80 @@ def login():
         conn.close()
 
 
-# ---------------- CHECK LOGIN ----------------
-@app.route("/check", methods=["GET"])
+# =========================================================
+# CHECK LOGIN
+# =========================================================
+
+@app.route(
+    "/check",
+    methods=["GET"]
+)
 def check():
 
     user = verify_token()
+
 
     print(
         "🔍 TOKEN CHECK:",
         user
     )
 
+
     if user:
 
         return jsonify({
-            "user": user
+            "user":
+                user
         }), 200
 
+
     return jsonify({
-        "user": None
+        "user":
+            None
     }), 401
 
 
-# ---------------- LOGOUT ----------------
-@app.route("/logout", methods=["POST"])
+# =========================================================
+# LOGOUT
+# =========================================================
+
+@app.route(
+    "/logout",
+    methods=["POST"]
+)
 def logout():
 
-    # JWT is stored on frontend.
-    # Frontend removes it during logout.
-
     return jsonify({
-        "message": "Logged out"
+        "message":
+            "Logged out"
     }), 200
 
 
-# ---------------- HOME ----------------
-@app.route("/", methods=["GET"])
+# =========================================================
+# HOME
+# =========================================================
+
+@app.route(
+    "/",
+    methods=["GET"]
+)
 def home():
 
     return jsonify({
         "message":
-        "AI Stress Detection Backend is running"
+            "AI Stress Detection Backend is running"
     }), 200
 
 
-# ---------------- RUN ----------------
+# =========================================================
+# RUN
+# =========================================================
+
 if __name__ == "__main__":
 
-    print("🚀 Server started")
+    print(
+        "🚀 Server started"
+    )
 
     app.run(
         host="0.0.0.0",
