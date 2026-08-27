@@ -1,5 +1,8 @@
 import os
-import jwt
+import base64
+import hashlib
+import hmac
+import json
 from datetime import datetime, timedelta, timezone
 
 from flask import Flask, request, jsonify
@@ -7,6 +10,71 @@ from flask_cors import CORS
 from werkzeug.security import generate_password_hash, check_password_hash
 
 from database import get_db_connection
+
+
+class _JWTError(Exception):
+    pass
+
+
+class _ExpiredSignatureError(_JWTError):
+    pass
+
+
+class _InvalidTokenError(_JWTError):
+    pass
+
+
+class _JWT:
+    ExpiredSignatureError = _ExpiredSignatureError
+    InvalidTokenError = _InvalidTokenError
+
+    @staticmethod
+    def _encode_part(value):
+        return base64.urlsafe_b64encode(
+            json.dumps(value, separators=(",", ":")).encode("utf-8")
+        ).rstrip(b"=").decode("ascii")
+
+    @staticmethod
+    def _decode_part(value):
+        return json.loads(base64.urlsafe_b64decode(value + "=" * (-len(value) % 4)))
+
+    def encode(self, payload, key, algorithm="HS256"):
+        if algorithm != "HS256":
+            raise _InvalidTokenError("Unsupported algorithm")
+        header = self._encode_part({"alg": "HS256", "typ": "JWT"})
+        body = self._encode_part(payload)
+        message = f"{header}.{body}".encode("ascii")
+        signature = hmac.new(key.encode("utf-8"), message, hashlib.sha256).digest()
+        encoded_signature = base64.urlsafe_b64encode(signature).rstrip(b"=").decode("ascii")
+        return f"{header}.{body}.{encoded_signature}"
+
+    def decode(self, token, key, algorithms=None):
+        try:
+            header_text, body_text, signature_text = token.split(".")
+            header = self._decode_part(header_text)
+            if algorithms and header.get("alg") not in algorithms:
+                raise _InvalidTokenError("Unsupported algorithm")
+            expected = hmac.new(
+                key.encode("utf-8"),
+                f"{header_text}.{body_text}".encode("ascii"),
+                hashlib.sha256,
+            ).digest()
+            actual = base64.urlsafe_b64decode(
+                signature_text + "=" * (-len(signature_text) % 4)
+            )
+            if not hmac.compare_digest(actual, expected):
+                raise _InvalidTokenError("Invalid signature")
+            payload = self._decode_part(body_text)
+            if payload.get("exp", 0) < datetime.now(timezone.utc).timestamp():
+                raise _ExpiredSignatureError("Token expired")
+            return payload
+        except (_ExpiredSignatureError, _InvalidTokenError):
+            raise
+        except (ValueError, TypeError, KeyError, json.JSONDecodeError):
+            raise _InvalidTokenError("Invalid token")
+
+
+jwt = _JWT()
 
 print("🔥 APP STARTED")
 
