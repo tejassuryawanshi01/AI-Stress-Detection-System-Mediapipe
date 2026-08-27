@@ -14,6 +14,8 @@ const passwordRegex = /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{6,}$/;
 // ---------------- MESSAGE HELPER ----------------
 
 function showMessage(msgElem, text, color = "red") {
+  if (!msgElem) return;
+
   msgElem.textContent = text;
   msgElem.style.color = color;
 }
@@ -58,8 +60,6 @@ async function register() {
       headers: {
         "Content-Type": "application/json",
       },
-
-      credentials: "include",
 
       body: JSON.stringify({
         username,
@@ -113,8 +113,6 @@ async function login() {
         "Content-Type": "application/json",
       },
 
-      credentials: "include",
-
       body: JSON.stringify({
         username,
         password,
@@ -127,21 +125,33 @@ async function login() {
       return showMessage(msg, data.message || "Login failed!");
     }
 
-    showMessage(msg, "Login successful!", "green");
+    // ---------------- SAVE JWT TOKEN ----------------
+
+    if (!data.token) {
+      console.error("❌ No token received from backend");
+
+      return showMessage(
+        msg,
+        "Login successful, but authentication token was not received.",
+      );
+    }
+
+    localStorage.setItem("stress_auth_token", data.token);
+
+    localStorage.setItem("stress_username", data.user);
+
+    console.log("✅ Login successful");
+
+    console.log("✅ Token saved");
+
+    showMessage(msg, "Login successful! Redirecting...", "green");
 
     document.getElementById("loginUsername").value = "";
 
     document.getElementById("loginPassword").value = "";
 
-    /*
-      Do NOT check /check here.
-
-      Backend has already confirmed the login.
-      Go directly to the dashboard.
-    */
-
     setTimeout(() => {
-      window.location.href = "index.html";
+      window.location.replace("index.html");
     }, 500);
   } catch (error) {
     console.error("Login Error:", error);
@@ -154,17 +164,17 @@ async function login() {
 
 async function logout() {
   try {
-    const res = await fetch(`${API_BASE_URL}/logout`, {
+    await fetch(`${API_BASE_URL}/logout`, {
       method: "POST",
-      credentials: "include",
     });
-
-    const data = await res.json();
-
-    console.log("Logout:", data);
   } catch (error) {
     console.error("Logout Error:", error);
   }
+
+  // Remove authentication
+  localStorage.removeItem("stress_auth_token");
+
+  localStorage.removeItem("stress_username");
 
   window.location.replace("login.html");
 }
