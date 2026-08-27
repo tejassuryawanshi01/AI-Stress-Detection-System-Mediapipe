@@ -49,18 +49,12 @@ class _JWT:
 
         return json.loads(
             base64.urlsafe_b64decode(
-                value +
-                "=" * (-len(value) % 4)
+                value + "=" * (-len(value) % 4)
             )
         )
 
 
-    def encode(
-        self,
-        payload,
-        key,
-        algorithm="HS256"
-    ):
+    def encode(self, payload, key, algorithm="HS256"):
 
         if algorithm != "HS256":
             raise _InvalidTokenError(
@@ -72,9 +66,7 @@ class _JWT:
             "typ": "JWT"
         })
 
-        body = self._encode_part(
-            payload
-        )
+        body = self._encode_part(payload)
 
         message = (
             f"{header}.{body}"
@@ -87,25 +79,17 @@ class _JWT:
         ).digest()
 
         encoded_signature = (
-            base64.urlsafe_b64encode(
-                signature
-            )
+            base64.urlsafe_b64encode(signature)
             .rstrip(b"=")
             .decode("ascii")
         )
 
         return (
-            f"{header}.{body}."
-            f"{encoded_signature}"
+            f"{header}.{body}.{encoded_signature}"
         )
 
 
-    def decode(
-        self,
-        token,
-        key,
-        algorithms=None
-    ):
+    def decode(self, token, key, algorithms=None):
 
         try:
 
@@ -118,8 +102,8 @@ class _JWT:
             )
 
             if (
-                algorithms and
-                header.get("alg")
+                algorithms
+                and header.get("alg")
                 not in algorithms
             ):
                 raise _InvalidTokenError(
@@ -133,8 +117,8 @@ class _JWT:
             ).digest()
 
             actual = base64.urlsafe_b64decode(
-                signature_text +
-                "=" * (-len(signature_text) % 4)
+                signature_text
+                + "=" * (-len(signature_text) % 4)
             )
 
             if not hmac.compare_digest(
@@ -151,8 +135,7 @@ class _JWT:
 
             if (
                 payload.get("exp", 0)
-                <
-                datetime.now(
+                < datetime.now(
                     timezone.utc
                 ).timestamp()
             ):
@@ -233,12 +216,13 @@ def create_token(username):
 
         "user": username,
 
-        "exp":
-            datetime.now(
-                timezone.utc
-            )
-            +
-            timedelta(days=7)
+        # IMPORTANT:
+        # Store exp as Unix timestamp,
+        # not datetime object.
+        "exp": (
+            datetime.now(timezone.utc)
+            + timedelta(days=7)
+        ).timestamp()
     }
 
     return jwt.encode(
@@ -359,7 +343,6 @@ def register():
 
         cur = conn.cursor()
 
-
         cur.execute(
             """
             SELECT *
@@ -372,7 +355,6 @@ def register():
                 email
             )
         )
-
 
         user = cur.fetchone()
 
@@ -496,7 +478,6 @@ def login():
 
     cur = None
 
-
     try:
 
         cur = conn.cursor()
@@ -538,6 +519,7 @@ def login():
             }), 401
 
 
+        # Create JWT token
         token = create_token(
             user[1]
         )
@@ -562,7 +544,6 @@ def login():
 
         }), 200
 
-
     except Exception as e:
 
         print(
@@ -583,7 +564,6 @@ def login():
 
         conn.close()
 
-
 # =========================================================
 # CHECK LOGIN
 # =========================================================
@@ -602,7 +582,6 @@ def check():
         user
     )
 
-
     if user:
 
         return jsonify({
@@ -615,7 +594,6 @@ def check():
         "user":
             None
     }), 401
-
 
 # =========================================================
 # LOGOUT
@@ -632,7 +610,6 @@ def logout():
             "Logged out"
     }), 200
 
-
 # =========================================================
 # HOME
 # =========================================================
@@ -647,7 +624,6 @@ def home():
         "message":
             "AI Stress Detection Backend is running"
     }), 200
-
 
 # =========================================================
 # RUN
