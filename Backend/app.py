@@ -22,7 +22,7 @@ CORS(
         "http://localhost:5500",
         "http://127.0.0.1:5000",
         "http://localhost:5000",
-        "https://your-frontend.onrender.com"
+        "https://ai-stress-detection-system-mediapipe-1.onrender.com"
     ]
 )
 
